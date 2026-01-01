@@ -84,40 +84,59 @@ def main():
                 res_file.write(f"{d}: ERROR ({e})\n")
                 continue
 
-            # 6. Compare output.log
-            src_log = os.path.join(src_dir, "output.log")
-            dest_log = os.path.join(dest_dir, "output.log")
-
-            if not os.path.exists(src_log):
-                print(" SKIP (No Ref Log)")
-                res_file.write(f"{d}: SKIP (Reference output.log missing)\n")
-                continue
+            # 6. Compare output.log and regression/*
+            files_to_check = []
+            if os.path.exists(os.path.join(src_dir, "output.log")):
+                files_to_check.append("output.log")
             
-            if not os.path.exists(dest_log):
-                print(" FAIL (No Output)")
-                res_file.write(f"{d}: FAIL (No output.log generated)\n")
+            src_reg_dir = os.path.join(src_dir, "regression")
+            if os.path.exists(src_reg_dir) and os.path.isdir(src_reg_dir):
+                for f in sorted(os.listdir(src_reg_dir)):
+                    files_to_check.append(os.path.join("regression", f))
+
+            if not files_to_check:
+                print(" SKIP (No Ref Logs)")
+                res_file.write(f"{d}: SKIP (No reference logs found)\n")
                 continue
 
-            # Read and Compare
-            with open(src_log, 'r') as f1, open(dest_log, 'r') as f2:
-                lines_ref = f1.readlines()
-                lines_new = f2.readlines()
+            all_diffs = []
+            missing_files = []
 
-            diff = list(difflib.unified_diff(lines_ref, lines_new, 
-                                           fromfile=f"Reference/{d}/output.log", 
-                                           tofile=f"Result/{d}/output.log",
-                                           lineterm=''))
+            for rel_path in files_to_check:
+                src_f = os.path.join(src_dir, rel_path)
+                dest_f = os.path.join(dest_dir, rel_path)
 
-            if not diff:
+                if not os.path.exists(dest_f):
+                    missing_files.append(rel_path)
+                    continue
+
+                with open(src_f, 'r') as f1, open(dest_f, 'r') as f2:
+                    lines_ref = f1.readlines()
+                    lines_new = f2.readlines()
+                
+                diff = list(difflib.unified_diff(lines_ref, lines_new, 
+                                               fromfile=f"Reference/{d}/{rel_path}", 
+                                               tofile=f"Result/{d}/{rel_path}",
+                                               lineterm=''))
+                all_diffs.extend(diff)
+
+            if not missing_files and not all_diffs:
                 print(" PASS")
                 res_file.write(f"{d}: PASS\n")
             else:
-                print(" FAIL (Diff)")
+                print(" FAIL", end="")
+                if missing_files: print(f" (Missing: {', '.join(missing_files)})", end="")
+                if all_diffs: print(" (Diff)", end="")
+                print("")
+                
                 res_file.write(f"{d}: FAIL\n")
                 diff_file.write(f"========================================\n")
                 diff_file.write(f"FAIL: Case {d}\n")
                 diff_file.write(f"========================================\n")
-                diff_file.writelines(diff)
+                if missing_files:
+                    diff_file.write(f"Missing files: {', '.join(missing_files)}\n\n")
+                if all_diffs:
+                    diff_file.writelines(all_diffs)
                 diff_file.write("\n\n")
 
     print(f"\nRegression Test Completed.")
