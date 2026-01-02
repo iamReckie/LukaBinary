@@ -34,8 +34,9 @@ def main():
             sys.exit(1)
 
     # Create Results Directory
-    if not os.path.exists(results_path):
-        os.makedirs(results_path)
+    if os.path.exists(results_path):
+        shutil.rmtree(results_path)
+    os.makedirs(results_path)
 
     # Output Files
     result_txt_path = os.path.join(results_path, "test_result.txt")
