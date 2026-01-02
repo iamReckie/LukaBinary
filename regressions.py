@@ -115,11 +115,16 @@ def main():
                     lines_ref = f1.readlines()
                     lines_new = f2.readlines()
                 
-                diff = list(difflib.unified_diff(lines_ref, lines_new, 
-                                               fromfile=f"Reference/{d}/{rel_path}", 
-                                               tofile=f"Result/{d}/{rel_path}",
-                                               lineterm=''))
-                all_diffs.extend(diff)
+                # Custom Diff Logic
+                matcher = difflib.SequenceMatcher(None, lines_ref, lines_new)
+                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                    if tag != 'equal':
+                        all_diffs.append(f"Original line from {i1 + 1} to {i2} in {rel_path}\n")
+                        all_diffs.extend(lines_ref[i1:i2])
+                        all_diffs.append(f"------------------------------------------\n")
+                        all_diffs.append(f"Current line from {j1 + 1} to {j2} in {rel_path}\n")
+                        all_diffs.extend(lines_new[j1:j2])
+                        all_diffs.append(f"========================================\n")
 
             if not missing_files and not all_diffs:
                 print(" PASS")
